@@ -13,6 +13,8 @@
 // TODO: Decide internet data x historical data (send invalid data? send outdated data? If yes, Use queue to buffer unsent messages.)
 // TODO: Remove ArduinoJson
 // TODO: OTA uploads
+// TODO: Reuse timestamp build in check function
+// TODO: Watchdog
 
 #include <Arduino.h>
 #include "secrets.h"
@@ -57,10 +59,11 @@ void checkMQTT();
 void checkWiFi();
 bool buildPayload(char *output, size_t outputSize);
 static inline double roundN(double value, int places);
+bool isGPSTimestampValid();
 
 void setup()
 {
-    sprintf(DEVICE_ID, "bus_%u", ESP.getChipId());
+    snprintf(DEVICE_ID, sizeof(DEVICE_ID), "bus_%u", ESP.getChipId());
 
     // gpsSerial.begin(GPS_BAUD);
     Serial.begin(GPS_BAUD);
@@ -91,36 +94,32 @@ void loop()
     static unsigned long lastSend = 0;
     bool intervalHasPassed = (millis() - lastSend) > MQTT_PUB_INTERVAL_MS;
 
-    // https://github.com/mikalhart/TinyGPSPlus/issues/107: isValid() does not really mean valid data.
-    // With valid timestamp we can study where gps failed.
-    // NOTE: TinyGPS does internal timestamp prediction when no gps readings are available, so don't check for isUpdated().
-    bool timestampIsValid = gps.date.isValid() && gps.time.isValid() &&
-                            gps.date.year() >= 2020 &&
-                            gps.date.month() >= 1 &&
-                            gps.date.day() >= 1 &&
-                            gps.time.hour() < 24 &&
-                            gps.time.minute() < 60 &&
-                            gps.time.second() < 60;
-
-    if (intervalHasPassed && timestampIsValid)
+    if (!intervalHasPassed)
     {
-        lastSend = millis();
-        char message[256];
-
-        if (!buildPayload(message, sizeof(message)))
-        {
-            DEBUG_PRINTLN("Failed to build payload.");
-            return;
-        }
-        DEBUG_PRINTLN(message);
-
-        if (!mqttClient.connected())
-        {
-            DEBUG_PRINTLN("MQTT not connected, skipping publish");
-            return;
-        }
-        mqttClient.publish(MQTT_TOPIC, message);
+        return;
     }
+    if (!isGPSTimestampValid())
+    {
+        DEBUG_PRINTLN("Invalid timestamp, skipping payload build.");
+        return;
+    }
+
+    lastSend = millis();
+    char message[256];
+
+    if (!buildPayload(message, sizeof(message)))
+    {
+        DEBUG_PRINTLN("Failed to build payload.");
+        return;
+    }
+    DEBUG_PRINTLN(message);
+
+    if (!mqttClient.connected())
+    {
+        DEBUG_PRINTLN("MQTT not connected, skipping publish");
+        return;
+    }
+    mqttClient.publish(MQTT_TOPIC, message);
 }
 
 void checkWiFi()
@@ -183,13 +182,13 @@ bool buildPayload(char *output, size_t outputSize)
     jsonData.clear();
 
     char timestampStr[32];
-    sprintf(timestampStr, "%04d-%02d-%02dT%02d:%02d:%02dZ",
-            gps.date.year(),
-            gps.date.month(),
-            gps.date.day(),
-            gps.time.hour(),
-            gps.time.minute(),
-            gps.time.second());
+    snprintf(timestampStr, sizeof(timestampStr), "%04u-%02u-%02uT%02u:%02u:%02uZ",
+             gps.date.year(),
+             gps.date.month(),
+             gps.date.day(),
+             gps.time.hour(),
+             gps.time.minute(),
+             gps.time.second());
 
     jsonData["device"]["id"] = DEVICE_ID;
     jsonData["gps"]["timestamp_utc"] = timestampStr;
@@ -220,4 +219,47 @@ static inline double roundN(double value, int places)
     return (value >= 0.0)
                ? (int)(value * factors[places] + 0.5) / factors[places]
                : (int)(value * factors[places] - 0.5) / factors[places];
+}
+
+bool isGPSTimestampValid()
+{
+    // https://github.com/mikalhart/TinyGPSPlus/issues/107: isValid() does not really mean valid data.
+    // With valid timestamp we can study where gps failed.
+    /* NOTE: TinyGPS does internal timestamp prediction when no gps readings are available (we'll use those predictions).
+     * Those predictions do not pass isValid()
+     */
+
+    // //  1. Check if date and time are valid (not entirely reliable, see the link above)
+    // if (!gps.date.isValid() || !gps.time.isValid())
+    //     return false;
+
+    // 2. Check for default timestamp pattern (sometimes isValid() returns true for this)
+    if (gps.date.year() == 2000 && gps.date.month() == 0 && gps.date.day() == 0)
+        return false;
+
+    // 3. Check if date and time have values inside basic ranges
+    if (!(gps.date.year() >= 2025 &&
+          gps.date.month() >= 1 && gps.date.month() <= 12 &&
+          gps.date.day() >= 1 && gps.date.day() <= 31 &&
+          gps.time.hour() < 24 &&
+          gps.time.minute() < 60 &&
+          gps.time.second() < 60))
+        return false;
+
+    static char lastTimestamp[32] = "";
+    char currentTimestamp[32];
+    snprintf(currentTimestamp, sizeof(currentTimestamp), "%04u-%02u-%02uT%02u:%02u:%02uZ",
+             gps.date.year(),
+             gps.date.month(),
+             gps.date.day(),
+             gps.time.hour(),
+             gps.time.minute(),
+             gps.time.second());
+
+    // 4. Check if date and time was updated (isUpdated() only works for non-predicted values)
+    if (strcmp(lastTimestamp, currentTimestamp) == 0)
+        return false;
+
+    strcpy(lastTimestamp, currentTimestamp);
+    return true;
 }
