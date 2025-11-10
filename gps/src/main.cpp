@@ -42,7 +42,7 @@ static const int GPS_BAUD = 115200; // Do NOT use 9600 baud rate, only 115200 wo
 
 char DEVICE_ID[32];
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #define DEBUG_PRINT(x) Serial.print(x)
 #define DEBUG_PRINTLN(x) Serial.println(x)

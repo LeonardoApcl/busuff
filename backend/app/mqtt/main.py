@@ -28,6 +28,7 @@ def connect_mqtt() -> mqttc.Client:
         reason_code: mqttrc.ReasonCode,
         properties: mqttprop.Properties | None,
     ):
+        # https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901031
         if reason_code == 0:
             print("Connected to MQTT Broker!")
         else:
