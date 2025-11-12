@@ -1,50 +1,34 @@
-/* References:
- * https://randomnerdtutorials.com/esp8266-nodemcu-neo-6m-gps-module-arduino/
- * https://arduinojson.org/
- * https://www.emqx.com/en/blog/esp8266-connects-to-the-public-mqtt-broker
- * https://tttapa.github.io/ESP8266/Chap07%20-%20Wi-Fi%20Connections.html
- * http://www.pequenosprojetos.com.br/rastreador-gps-sim800l-e-esp8266-node-mcu/
- * https://stuartsprojects.github.io/2024/09/21/How-not-to-read-a-GPS.html
- */
-
-// TODO: Test SIM800L
-// TODO: Micro SIM card free trial
-// TODO: Introduce auth and encryption to MQTT comm
-// TODO: Resolve RX pin issue (change gps baud rate to 9600)
-// TODO: Decide internet data x historical data (send outdated data? If yes, Use queue to buffer unsent messages.)
-// TODO: Remove ArduinoJson
-
+// Libraries
 #include <Arduino.h>
-#include "secrets.h"
+#include "secrets.h" // WiFi and Hotspot credentials
+#include <TinyGPS++.h>
+#include <ArduinoJson.h>
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
 
+// Pin Definitions
 static const int WIFI_LED = D1;
 static const int MQTT_LED = D2;
 
-#include <TinyGPS++.h>
-TinyGPSPlus gps;
-
-#include <ArduinoJson.h>
-JsonDocument jsonData;
-
-#include <ESP8266WiFi.h>
-WiFiClient wifiClient;
-
-#include <PubSubClient.h>
-PubSubClient mqttClient;
-
-// https://github.com/mqtt/mqtt.org/wiki/public_brokers
+// Constants
+static const int GPS_BAUD = 115200; // Do NOT use 9600 baud rate, only 115200 works.
 static const char MQTT_BROKER[] = "broker.hivemq.com";
 static const char MQTT_TOPIC[] = "mqtt_iot_123321/busuff";
 static const int MQTT_PORT = 1883;
 static const unsigned long MQTT_PUB_INTERVAL_MS = 5000;
+static const unsigned long WIFI_RECONNECT_INTERVAL_MS = 5000;
+static const unsigned long MQTT_RECONNECT_INTERVAL_MS = 3000;
 
-// #include <SoftwareSerial.h>
-// static const int RX_PIN = D7;
-// SoftwareSerial gpsSerial(RX_PIN, -1);
-static const int GPS_BAUD = 115200; // Do NOT use 9600 baud rate, only 115200 works.
+// Global Objects
+TinyGPSPlus gps;
+WiFiClient wifiClient;
+PubSubClient mqttClient(wifiClient);
+JsonDocument jsonData;
 
+// Device ID (unique per ESP8266)
 char DEVICE_ID[32];
 
+// Helper Macros for Debugging
 #define DEBUG 1
 #if DEBUG
 #define DEBUG_PRINT(x) Serial.print(x)
@@ -57,13 +41,17 @@ char DEVICE_ID[32];
 // Function declarations
 void checkMQTT();
 void checkWiFi();
+static inline void readGPS();
 bool buildPayload(char *output, size_t outputSize);
 bool buildTimestamp(char *output, size_t outputSize);
 static inline double roundN(double value, int places);
 
+// Setup
 void setup()
 {
-    // HIGH == Disconnected
+    Serial.begin(GPS_BAUD);
+
+    // Led on HIGH == Disconnected
     pinMode(WIFI_LED, OUTPUT);
     pinMode(MQTT_LED, OUTPUT);
     digitalWrite(WIFI_LED, HIGH);
@@ -71,47 +59,31 @@ void setup()
 
     snprintf(DEVICE_ID, sizeof(DEVICE_ID), "bus_%u", ESP.getChipId());
 
-    // gpsSerial.begin(GPS_BAUD);
-    Serial.begin(GPS_BAUD);
-
     WiFi.begin(HOTSPOT_SSID, HOTSPOT_PASS);
-
-    DEBUG_PRINT("IP address: ");
-    DEBUG_PRINTLN(WiFi.localIP());
-
     mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
-    mqttClient.setClient(wifiClient);
 }
 
+// Main Loop
 void loop()
 {
-    /* NOTE: Keep all tasks non-blocking (for OTA, MQTT, and WiFi reconnect to work reliably),
-     * that means no while loops, since watchdog needs constant feed.
+    /* NOTE: Keep all tasks non-blocking, since watchdog needs constant feed.
      * It gets it through the end of each loop() iteration
      */
 
     checkWiFi();
     checkMQTT();
+    readGPS();
 
-    while (Serial.available() > 0)
-    {
-        char c = Serial.read();
-        gps.encode(c);
-        // DEBUG_PRINT(c); // raw output
-    }
-
-    // static, initialization happens only once and variable persists values between iterations
+    // Check if interval has passed
     static unsigned long lastSend = 0;
-    bool intervalHasPassed = (millis() - lastSend) > MQTT_PUB_INTERVAL_MS;
-
-    if (!intervalHasPassed)
+    if (millis() - lastSend < MQTT_PUB_INTERVAL_MS)
     {
         return;
     }
-
     lastSend = millis();
-    char message[256];
 
+    // Try to build the json payload
+    char message[256];
     if (!buildPayload(message, sizeof(message)))
     {
         DEBUG_PRINTLN("Failed to build payload.");
@@ -119,6 +91,7 @@ void loop()
     }
     DEBUG_PRINTLN(message);
 
+    // Try to publish the json payload to broker
     if (!mqttClient.connected())
     {
         DEBUG_PRINTLN("MQTT not connected, skipping publish");
@@ -134,13 +107,12 @@ void checkWiFi()
 
     if (WiFi.status() != WL_CONNECTED)
     {
-        if (millis() - lastAttempt > 5000)
+        if (millis() - lastAttempt > WIFI_RECONNECT_INTERVAL_MS)
         {
             lastAttempt = millis();
 
-            DEBUG_PRINT("Attempt to connect to WiFi. SSID: ");
+            DEBUG_PRINT("Trying to connect to WiFi: ");
             DEBUG_PRINTLN(WiFi.SSID());
-
             WiFi.reconnect();
         }
         wasConnected = false;
@@ -149,8 +121,6 @@ void checkWiFi()
     else if (!wasConnected)
     {
         DEBUG_PRINTLN("WiFi connected!");
-        DEBUG_PRINT("IP: ");
-        DEBUG_PRINTLN(WiFi.localIP());
         wasConnected = true;
         digitalWrite(WIFI_LED, LOW);
     }
@@ -163,10 +133,10 @@ void checkMQTT()
     if (!mqttClient.connected())
     {
         // Try only if we have WiFi
-        if (WiFi.status() == WL_CONNECTED && millis() - lastAttempt > 3000)
+        if (WiFi.status() == WL_CONNECTED && millis() - lastAttempt > MQTT_RECONNECT_INTERVAL_MS)
         {
             lastAttempt = millis();
-            DEBUG_PRINT("Attempt to connect to MQTT broker. URL: ");
+            DEBUG_PRINT("Trying to connect to MQTT broker: ");
             DEBUG_PRINTLN(MQTT_BROKER);
             mqttClient.connect(DEVICE_ID);
         }
@@ -186,11 +156,19 @@ void checkMQTT()
     }
 }
 
+static inline void readGPS()
+{
+    while (Serial.available() > 0)
+    {
+        gps.encode(Serial.read());
+    }
+}
+
 bool buildPayload(char *output, size_t outputSize)
 {
     /* Two important notes for checking data:
      * 1. https://github.com/mikalhart/TinyGPSPlus/issues/107: isValid() does not really mean valid data.
-     * 2. https://forum.arduino.cc/t/tinygpsplus-isupdated-qustion/1233296: isUpdated() indicates whether the object’s value has been updated/read (not necessarily changed) since the last time you queried it.
+     * 2. https://forum.arduino.cc/t/tinygpsplus-isupdated-qustion/1233296: isUpdated() indicates whether the object’s value has been read (not necessarily changed) since the last time you queried it.
      */
     jsonData.clear();
 
@@ -224,7 +202,6 @@ bool buildPayload(char *output, size_t outputSize)
 
 bool buildTimestamp(char *output, size_t outputSize)
 {
-    // With valid timestamp we can study where gps failed.
     /* NOTE: TinyGPS does internal timestamp prediction when no gps readings are available (we'll use those predictions).
      * Those predictions do not pass isValid()
      */
@@ -239,7 +216,7 @@ bool buildTimestamp(char *output, size_t outputSize)
         return false;
 
     static char lastTimestamp[32] = "";
-    // create currentTimestamp
+    // Create currentTimestamp
     snprintf(output, outputSize, "%04u-%02u-%02uT%02u:%02u:%02uZ",
              gps.date.year(),
              gps.date.month(),
@@ -248,7 +225,7 @@ bool buildTimestamp(char *output, size_t outputSize)
              gps.time.minute(),
              gps.time.second());
 
-    // 2. Check if date and time was updated
+    // 2. Check if timestamp has changed
     // isUpdated() does not check if value has changed and only works for non-predicted values
     if (strcmp(lastTimestamp, output) == 0)
         return false;
