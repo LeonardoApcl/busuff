@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import Generator
 
 # CONFIGURAÇÃO DO BANCO
-
 DB_USER = "postgres"
 DB_PASSWORD = "1234"
 DB_HOST = "localhost"
