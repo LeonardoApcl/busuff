@@ -1,8 +1,9 @@
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, DateTime
 )
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from datetime import datetime
+from typing import Generator
 
 # CONFIGURAÇÃO DO BANCO
 
@@ -15,7 +16,7 @@ DB_DRIVER = "postgresql+psycopg2"
 DATABASE_URL = f"{DB_DRIVER}://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 engine = create_engine(DATABASE_URL, echo=False)
-SessionLocal = sessionmaker(bind=engine)
+SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 Base = declarative_base()
 
 
@@ -24,7 +25,7 @@ class LeituraGPS(Base):
     __tablename__ = "leituras_gps"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    device_id = Column(String, nullable=False)
+    device_id = Column(String(50), nullable=False)
     timestamp_utc = Column(DateTime, nullable=False)
     latitude = Column(Float)
     longitude = Column(Float)
@@ -71,7 +72,19 @@ def salvar_leitura(json_data: dict):
 
     except Exception as e:
         session.rollback() # Reverte a transação em caso de erro
-        print(f"❌ Erro ao salvar leitura: {e}")
+        print(f"Erro ao salvar leitura: {e}")
         # Se você quiser re-lançar o erro: raise e
     finally:
         session.close() # Sempre fecha a sessão
+
+def get_db() -> Generator[Session, None, None]:
+    """
+    Cria uma nova sessão de banco de dados (SessionLocal),
+    a entrega para o código chamador (yield) e garante que ela
+    será fechada (db.close()) no bloco finally, mesmo em caso de erro.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
