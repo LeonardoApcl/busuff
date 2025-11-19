@@ -1,6 +1,4 @@
-from sqlalchemy import (
-    create_engine, Column, Integer, String, Float, DateTime
-)
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from datetime import datetime
 from typing import Generator
@@ -37,6 +35,7 @@ class LeituraGPS(Base):
 # Cria as tabelas se não existirem,  importante para garantir que a tabela exista antes de inserir.
 Base.metadata.create_all(engine)
 
+
 # FUNÇÃO AUXILIAR PARA SALVAR UMA LEITURA JSON
 def salvar_leitura(json_data: dict):
     # Cria uma nova sessão a cada chamada da função para gerenciamento seguro
@@ -52,7 +51,7 @@ def salvar_leitura(json_data: dict):
 
         location = gps.get("location", {})
         latitude = location.get("lat")
-        longitude = location.get("lon") or location.get("lng")
+        longitude = location.get("lng")
 
         leitura = LeituraGPS(
             device_id=device_id,
@@ -70,11 +69,12 @@ def salvar_leitura(json_data: dict):
         print(f"✔ Leitura salva com sucesso! Device ID: {device_id}")
 
     except Exception as e:
-        session.rollback() # Reverte a transação em caso de erro
+        session.rollback()  # Reverte a transação em caso de erro
         print(f"Erro ao salvar leitura: {e}")
         # Se você quiser re-lançar o erro: raise e
     finally:
-        session.close() # Sempre fecha a sessão
+        session.close()  # Sempre fecha a sessão
+
 
 def get_db() -> Generator[Session, None, None]:
     """

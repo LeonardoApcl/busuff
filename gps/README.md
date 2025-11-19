@@ -16,7 +16,7 @@
 - [ ] Micro SIM card free trial
 - [ ] Introduce auth and encryption to MQTT comm
 - [ ] Resolve RX pin issue (change gps baud rate to 9600)
-- [ ]Decide internet data x historical data (send outdated data? If yes, Use queue to buffer unsent messages.)
+- [ ] Decide internet data x historical data (send outdated data? If yes, Use queue to buffer unsent messages.)
 - [ ] Remove ArduinoJson
 - [ ] Update this README
 - [ ] Make readGPS non-blocking

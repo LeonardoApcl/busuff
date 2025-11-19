@@ -11,7 +11,7 @@
 		"timestamp_utc": string (ISO 8601 UTC time),
 		"location" {
 			"lat": float (*OPTIONAL*, 6 decimal places),
-			"lon": float (*OPTIONAL*, 6 decimal places)
+			"lng": float (*OPTIONAL*, 6 decimal places)
 		},
 		"speed_kmh": float (*OPTIONAL*, 1 decimal),
 		"course_deg": float (*OPTIONAL*, 1 decimal, 0–360°, degrees from North),
