@@ -1,0 +1,11 @@
+## How to run mqtt client
+
+```bash
+# In backend/ folder, run:
+
+python -m app.mqtt.main
+```
+
+## TODO
+
+- [ ] Move db credentials do .env file
