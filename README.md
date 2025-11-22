@@ -29,7 +29,8 @@ postgres=# \l
 
 postgres=# \c projeto_gps
 # You are now connected to database "projeto_gps" as user "postgres".
-# projeto_gps=# \dt
+
+projeto_gps=# \dt
 #             List of relations
 #  Schema |     Name     | Type  |  Owner
 # --------+--------------+-------+----------
