@@ -32,7 +32,7 @@ class LeituraGPS(Base):
     hdop = Column(Float)
 
 
-# Cria as tabelas se não existirem,  importante para garantir que a tabela exista antes de inserir.
+# Cria as tabelas se não existirem, importante para garantir que a tabela exista antes de inserir.
 Base.metadata.create_all(engine)
 
 
