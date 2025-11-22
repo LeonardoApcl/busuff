@@ -11,7 +11,7 @@ static const int WIFI_LED = D1;
 static const int MQTT_LED = D2;
 
 // Constants
-static const int GPS_BAUD = 115200; // Do NOT use 9600 baud rate, only 115200 works.
+static const int GPS_BAUD = 115200;
 static const char MQTT_BROKER[] = "broker.hivemq.com";
 static const char MQTT_TOPIC[] = "mqtt_iot_123321/busuff";
 static const int MQTT_PORT = 1883;
@@ -28,9 +28,8 @@ JsonDocument jsonData;
 // Device ID (unique per ESP8266)
 char DEVICE_ID[32];
 
-// Helper Macros for Debugging
-#define DEBUG 1
-#if DEBUG
+// Helper Macros for Debugging (defined in platformio.ini)
+#if LOG_LEVEL >= 1
 #define DEBUG_PRINT(x) Serial.print(x)
 #define DEBUG_PRINTLN(x) Serial.println(x)
 #else
@@ -59,7 +58,7 @@ void setup()
 
     snprintf(DEVICE_ID, sizeof(DEVICE_ID), "bus_%u", ESP.getChipId());
 
-    WiFi.begin(HOTSPOT_SSID, HOTSPOT_PASS);
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
     mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
 }
 
