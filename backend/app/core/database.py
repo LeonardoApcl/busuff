@@ -35,8 +35,22 @@ class LeituraGPS(Base):
     hdop = Column(Float)
 
 
-# Cria as tabelas se não existirem, importante para garantir que a tabela exista antes de inserir.
-Base.metadata.create_all(engine)
+def init_db():
+    # Cria as tabelas se não existirem, importante para garantir que a tabela exista antes de inserir.
+    Base.metadata.create_all(engine)
+
+
+def get_db() -> Generator[Session, None, None]:
+    """
+    Cria uma nova sessão de banco de dados (SessionLocal),
+    a entrega para o código chamador (yield) e garante que ela
+    será fechada (db.close()) no bloco finally, mesmo em caso de erro.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 # FUNÇÃO AUXILIAR PARA SALVAR UMA LEITURA JSON
@@ -79,14 +93,4 @@ def salvar_leitura(json_data: jsonData) -> None:
         session.close()  # Sempre fecha a sessão
 
 
-def get_db() -> Generator[Session, None, None]:
-    """
-    Cria uma nova sessão de banco de dados (SessionLocal),
-    a entrega para o código chamador (yield) e garante que ela
-    será fechada (db.close()) no bloco finally, mesmo em caso de erro.
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+init_db()
