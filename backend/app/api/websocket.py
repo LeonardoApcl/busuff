@@ -6,23 +6,25 @@ import json
 
 router = APIRouter()
 
+
 # Função auxiliar para pegar a última leitura do banco
 def get_latest_position(db: Session):
     return db.query(LeituraGPS).order_by(LeituraGPS.timestamp_utc.desc()).first()
+
 
 @router.websocket("/ws/rotas")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("✅ Frontend conectado ao WebSocket!")
-    
+
     db = SessionLocal()
     last_id = 0
-    
+
     try:
         while True:
             # Busca a última leitura salva pelo MQTT
             leitura = get_latest_position(db)
-            
+
             if leitura:
                 # Só envia se for uma leitura nova ou para garantir atualização
                 # Aqui convertemos o objeto do banco para JSON
@@ -31,12 +33,12 @@ async def websocket_endpoint(websocket: WebSocket):
                     "lat": leitura.latitude,
                     "lng": leitura.longitude,
                     "speed": leitura.speed_kmh,
-                    "timestamp": leitura.timestamp_utc.isoformat()
+                    "timestamp": leitura.timestamp_utc.isoformat(),
                 }
-                
+
                 # Envia para o Frontend
                 await websocket.send_json(data)
-                
+
             else:
                 await websocket.send_text("Aguardando dados...")
 
