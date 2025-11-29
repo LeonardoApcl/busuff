@@ -18,7 +18,7 @@ broker = "broker.hivemq.com"
 port = 1883
 topic = "mqtt_iot_123321/busuff"
 transport: Literal["tcp", "websockets", "unix"] = "tcp"
-protocol = mqttc.MQTTv311
+protocol = mqttc.MQTTv5
 
 
 def connect_mqtt() -> mqttc.Client:
