@@ -116,10 +116,3 @@ projeto_gps=# SELECT * FROM leituras_gps;
   }
 }
 ```
-
-## TODO
-
-- [ ] Use pydantic for config
-- [ ] Implement websockets on_message mqtt event
-- [ ] Switch to psycopg2 non-binary
-- [ ] Add better logging
