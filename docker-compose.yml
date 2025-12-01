@@ -29,5 +29,15 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  caddy:
+    image: caddy:2.7
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+    depends_on:
+      - api
+    #  - frontend
+
 volumes:
   pgdata:
