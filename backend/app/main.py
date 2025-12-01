@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import websocket
 
 
 app = FastAPI()
@@ -13,9 +12,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Inclui a rota do websocket que criamos
-app.include_router(websocket.router)
 
 
 @app.get("/")

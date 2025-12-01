@@ -1,4 +1,14 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, select, ForeignKey, ARRAY
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Float,
+    DateTime,
+    select,
+    ForeignKey,
+    ARRAY,
+)
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 from datetime import datetime
 from typing import Generator, Optional, List
@@ -39,8 +49,9 @@ class LeituraGPS(Base):
     course_deg = Column(Float)
     num_satellites = Column(Integer)
     hdop = Column(Float)
-    #Permite acessar o objeto Device(leitura.device)
+    # Permite acessar o objeto Device(leitura.device)
     device = relationship("Device")
+
 
 class Route(Base):
     __tablename__ = "routes"
@@ -73,6 +84,7 @@ class Route(Base):
             "days": self.days,
         }
 
+
 # DEFINIÇÃO DA TABELA Device
 class Device(Base):
     __tablename__ = "devices"
@@ -82,11 +94,9 @@ class Device(Base):
     name = Column(String(100))
     # Espaço para adicionar mais colunas
 
+
 # Cria as tabelas se não existirem, importante para garantir que a tabela exista antes de inserir.
 def init_db():
-    # Deleta todas as tabelas (CUIDADO: APAGA TUDO!)
-    # Base.metadata.drop_all(engine)
-
     Base.metadata.create_all(engine)
 
 
@@ -113,7 +123,9 @@ def salvar_leitura(json_data: jsonData) -> None:
         gps = json_data["gps"]
 
         # GARANTE A EXISTÊNCIA DO DEVICE antes de salvar a leitura
-        get_or_create_device(session, device_id)  # device_name pode ser passado aqui se estiver no json
+        get_or_create_device(
+            session, device_id
+        )  # device_name pode ser passado aqui se estiver no json
 
         # Tratamento do timestamp
         timestamp_str = gps.get("timestamp_utc")
@@ -145,9 +157,9 @@ def salvar_leitura(json_data: jsonData) -> None:
     finally:
         session.close()  # Sempre fecha a sessão
 
+
 # Busca uma configuração de rota pelo ID e retorna um JSON (string). Retorna None se a rota não for encontrada.
 def obter_rota_json(route_id: str) -> Optional[str]:
-
     # Gerencia a sessão do banco de dados (usando o padrão get_db)
     for db in get_db():
         try:
@@ -175,9 +187,16 @@ def obter_rota_json(route_id: str) -> Optional[str]:
             print(f"Erro ao consultar o banco de dados: {e}")
             return None
 
- # Cria uma nova configuração de rota, gerencia sua própria sessão, faz o commit e a fecha.
-def salvar_rota(route_id: str, device_id: str, origin: str, destination: str, days: List[str], time_range: Optional[str] = None) -> None:
 
+# Cria uma nova configuração de rota, gerencia sua própria sessão, faz o commit e a fecha.
+def salvar_rota(
+    route_id: str,
+    device_id: str,
+    origin: str,
+    destination: str,
+    days: List[str],
+    time_range: Optional[str] = None,
+) -> None:
     session = SessionLocal()
     try:
         # Cria o objeto ORM (Route)
@@ -205,8 +224,11 @@ def salvar_rota(route_id: str, device_id: str, origin: str, destination: str, da
         # Sempre fecha a sessão, independentemente do sucesso ou falha
         session.close()
 
+
 # Busca o device pelo ID. Se não existir, o cria e o adiciona à sessão.
-def get_or_create_device(session: Session, device_id: str, device_name: str = None) -> Device:
+def get_or_create_device(
+    session: Session, device_id: str, device_name: str = None
+) -> Device:
     # Tenta buscar o device
     device = session.get(Device, device_id)
 
@@ -217,5 +239,6 @@ def get_or_create_device(session: Session, device_id: str, device_name: str = No
         print(f"Dispositivo '{device_id}' criado e adicionado à sessão.")
 
     return device
+
 
 init_db()

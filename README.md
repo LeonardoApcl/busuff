@@ -2,7 +2,11 @@
 
 ## How to run
 
-- Having Docker installed:
+1. Write corresponding credentials in `.env.example`
+
+2. Rename `.env.example` to `.env`
+
+3. Having Docker installed, run:
 
 ```bash
 docker compose up --build
