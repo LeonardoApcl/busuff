@@ -3,17 +3,19 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 from datetime import datetime
 from typing import Generator, Optional, List
 import json
+import os
 
 # Types
 jsonData = dict[str, dict[str, str | int]]
 
 # CONFIGURAÇÃO DO BANCO
-DB_USER = "postgres"
-DB_PASSWORD = "1234"
-DB_HOST = "db"
-DB_PORT = "5432"
-DB_NAME = "projeto_gps"
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = int(os.getenv("DB_PORT", 5432))
+DB_NAME = os.getenv("DB_NAME")
 DB_DRIVER = "postgresql+psycopg2"
+
 DATABASE_URL = f"{DB_DRIVER}://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 engine = create_engine(DATABASE_URL, echo=False)
@@ -87,8 +89,13 @@ def init_db():
 
     Base.metadata.create_all(engine)
 
-# Cria uma nova sessão de banco de dados (SessionLocal), a entrega para o código chamador (yield) e garante que ela será fechada (db.close()) no bloco finally, mesmo em caso de erro.
+
 def get_db() -> Generator[Session, None, None]:
+    """
+    Cria uma nova sessão de banco de dados (SessionLocal),
+    a entrega para o código chamador (yield) e garante que ela
+    será fechada (db.close()) no bloco finally, mesmo em caso de erro.
+    """
     db = SessionLocal()
     try:
         yield db
