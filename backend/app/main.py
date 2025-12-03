@@ -5,18 +5,19 @@ from pydantic import BaseModel
 from typing import List
 
 # Importando do seu arquivo database.py
-from .core/database import get_db, Route, LeituraGPS, salvar_leitura
+from app.core.database import get_db, Route, LeituraGPS, salvar_leitura
 
 app = FastAPI()
 
 # Configuração de CORS (Para o Frontend acessar o Backend)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Em produção, coloque o domínio da AWS
+    allow_origins=["*"],  # Em produção, coloque o domínio da AWS
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # --- MODELOS DE DADOS (Pydantic) ---
 class PresenceCreate(BaseModel):
@@ -24,7 +25,9 @@ class PresenceCreate(BaseModel):
     route_id: str
     device_id: str
 
+
 # --- ENDPOINTS ---
+
 
 @app.get("/routes")
 def get_routes(db: Session = Depends(get_db)):
@@ -35,6 +38,7 @@ def get_routes(db: Session = Depends(get_db)):
     # Converte para o formato que o frontend espera
     return [r.to_dict() for r in routes]
 
+
 @app.post("/presence")
 def mark_presence(data: PresenceCreate, db: Session = Depends(get_db)):
     """
@@ -44,5 +48,6 @@ def mark_presence(data: PresenceCreate, db: Session = Depends(get_db)):
     print(f"Presença marcada: {data.user_name} na rota {data.route_id}")
     # TODO: Criar tabela de presença no database.py e salvar aqui
     return {"message": "Presença confirmada com sucesso"}
+
 
 # O endpoint de simulação apenas inicia o script, ou você roda o script separado.
